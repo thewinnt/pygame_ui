@@ -41,7 +41,7 @@ COLOR_INDEX = [(0, 0, 0),
 # button
 class Button:
     def __init__(self, surface, x, y, width=100, height=50, font=None, text='', color_main=COLOR_MAIN, color_hover=COLOR_HOVER, color_click=COLOR_CLICK, color_text=COLOR_TEXT, color_outline=COLOR_OUTLINE):
-        '''A simple button, version 2.1'''
+        '''A simple button, version 2.1.1'''
         self.color_main = color_main
         self.color_hover = color_hover
         self.color_click = color_click
@@ -62,15 +62,23 @@ class Button:
         ## click_state can be used for inactive buttons
         is_pressed = pygame.mouse.get_pressed()[0]
         to_return = False
-        if click_state == 0 or (not self._is_hovered(mouse_pos) and not is_pressed):
-            pygame.draw.rect(self.surface, self.color_main, (self.x, self.y, self.width, self.height))
-        elif click_state == 1 or (self._is_hovered(mouse_pos) and not is_pressed):
-            pygame.draw.rect(self.surface, self.color_hover, (self.x, self.y, self.width, self.height))
-        elif click_state == 2 or (self._is_hovered(mouse_pos) and is_pressed):
-            pygame.draw.rect(self.surface, self.color_click, (self.x, self.y, self.width, self.height))
-            to_return = True
+        if click_state is not None:
+            if click_state == 0:
+                pygame.draw.rect(self.surface, self.color_main, (self.x, self.y, self.width, self.height))
+            elif click_state == 1:
+                pygame.draw.rect(self.surface, self.color_hover, (self.x, self.y, self.width, self.height))
+            elif click_state == 2:
+                pygame.draw.rect(self.surface, self.color_click, (self.x, self.y, self.width, self.height))
+        else:
+            if not self._is_hovered(mouse_pos):
+                pygame.draw.rect(self.surface, self.color_main, (self.x, self.y, self.width, self.height))
+            elif self._is_hovered(mouse_pos) and not is_pressed:
+                pygame.draw.rect(self.surface, self.color_hover, (self.x, self.y, self.width, self.height))
+            elif self._is_hovered(mouse_pos) and is_pressed:
+                pygame.draw.rect(self.surface, self.color_click, (self.x, self.y, self.width, self.height))
+                to_return = True
 
-        if outline_width:
+        if outline_width and self.color_outline:
             pygame.draw.rect(self.surface, self.color_outline, (self.x, self.y, self.width, self.height), outline_width)
 
         if self.text and not self.font is None:
@@ -81,7 +89,7 @@ class Button:
             return to_return
 
     def _is_hovered(self, mouse_pos=None):
-        if mouse_pos == None:
+        if mouse_pos is None:
             self.pos = pygame.mouse.get_pos()
         else:
             self.pos = mouse_pos
@@ -158,7 +166,7 @@ class Switch:
 
 class Hyperlink:
     def __init__(self, surface, x, y, text, font, color=COLOR_TEXT):
-        '''Some text that can be clicked to bring you somewhere else, version 2.1'''
+        '''Some text that can be clicked to bring you somewhere else, version 2.2'''
         self.surface = surface
         self.color = color
         self.x = x
@@ -174,15 +182,15 @@ class Hyperlink:
             self.pos = pygame.mouse.get_pos()
         else:
             self.pos = bkp_pos
-        if self.pos[0] > self.x and self.pos[0] < self.x + self.rendered_text.get_width() and self.pos[1] > self.y and self.pos[1] < self.y + self.rendered_text.get_height():
+        if self.pos[0] > self.x and self.pos[0] < self.x + self.width and self.pos[1] > self.y and self.pos[1] < self.y + self.height:
             return True
         else:
             return False
 
     def draw(self, bkp_pos=None) -> bool:
         '''Draws the link and returns its click state'''
-        self.rendered_text = self.font.render(self.text, 1, self.color)
-        self.surface.blit(self.rendered_text, (self.x, self.y))
+        txt = fancy_blit(self.surface, self.x, self.y, self.text, self.font, self.color, None)
+        self.width, self.height = self.font.size(txt)
         if not self.was_pressed and pygame.mouse.get_pressed()[0]:
             self.was_pressed = True
             is_clicked = True
@@ -197,7 +205,7 @@ class Hyperlink:
 
 class DropdownList:
     def __init__(self, surface, x, y, options, font, chosen=0, min_width=150, require_hover=False, max_len=6, color_base=COLOR_BASE, color_origin=COLOR_ORIGIN, color_text=COLOR_TEXT, color_outline=COLOR_OUTLINE, color_scroll=COLOR_SCROLLER, color_hover_base=COLOR_HOVER_BASE, color_hover_origin=COLOR_HOVER_ORIGIN, color_hover_scroll=COLOR_HOVER_SCROLLER):
-        '''A dropdown list, version 1.1'''
+        '''A dropdown list, version 1.2'''
         self.x = x
         self.y = y
         self.orig_x = self.x
@@ -274,9 +282,9 @@ class DropdownList:
 
         ## prepare force left side (i was too lazy to rewrite this code)
         if self.open:
-            self.surface = pygame.Surface((self.hitbox_open[1][0] + 1, self.hitbox_open[1][1] + 1))
+            self.surface = pygame.Surface((self.hitbox_open[1][0] + 1, self.hitbox_open[1][1] + 1)).convert_alpha()
         else:
-            self.surface = pygame.Surface((self.hitbox_closed[1][0] + 1, self.hitbox_closed[1][1] + 1))
+            self.surface = pygame.Surface((self.hitbox_closed[1][0] + 1, self.hitbox_closed[1][1] + 1)).convert_alpha()
         
         ## gather events
         if list_captures_events == None or list_captures_events == self:
@@ -388,8 +396,8 @@ class DropdownList:
         # blit to target
         self.targ_surf.blit(self.surface, (self.orig_x, self.orig_y))
 
-def fancy_blit(surface, x, y, text, font, default_color=COLOR_TEXT, background_color=COLOR_MAIN, reset_at_color=False) -> str:
-    '''Draws the text and returns it in a normal way (without technical symbols), version 2.0'''
+def fancy_blit(surface, x, y, text, font, default_color=COLOR_TEXT, background_color=COLOR_MAIN, return_surfaces=False, reset_at_color=False) -> str:
+    '''Draws the text and returns it in a normal way (without technical symbols), version 2.1'''
     # this is all from minecraft
     rendered_parts = []
     color = -1
@@ -457,19 +465,31 @@ def fancy_blit(surface, x, y, text, font, default_color=COLOR_TEXT, background_c
     size = rendered_parts[-1].get_size()
     if cross:
         pygame.draw.line(rendered_parts[-1], COLOR_INDEX[color], (0, size[1] // 2), (size[0], size[1] // 2), 3)
-    normal += word
-    offset = 0
-    for i in rendered_parts:
-        surface.blit(i, (x + offset, y))
-        offset += i.get_width()
-    font.set_bold(was_bold)
-    font.set_underline(was_underline)
-    font.set_italic(was_italic)
-    return normal
+    if not return_surfaces:
+        normal += word
+        offset = 0
+        for i in rendered_parts:
+            surface.blit(i, (x + offset, y))
+            offset += i.get_width()
+        font.set_bold(was_bold)
+        font.set_underline(was_underline)
+        font.set_italic(was_italic)
+        return normal
+    else:
+        size = 0
+        for i in rendered_parts:
+            size += i.get_width()
+        targ_surf = pygame.Surface((size, i.get_height())).convert_alpha()
+        offset = 0
+        for i in rendered_parts:
+            targ_surf.blit(i, (offset, 0))
+            offset += i.get_width()
+        return targ_surf
+            
 
 class TextField:
     def __init__(self, surface, x, y, font, width=100, height=50, default_value='', hint='', type_='string', outline_color_active=(0, 0, 0), outline_color_inactive=(50, 50, 50), field_color=(240, 240, 240)):
-        '''A rectangle which you can click to write something, version 1.1'''
+        '''A rectangle which you can click to write something, version 1.2'''
         self.width = width
         self.height = height
 
@@ -568,7 +588,7 @@ class TextField:
                     self.was_clicked = True
         return self.text
 
-    def draw(self, update=True, text_color=(0, 0, 0), bkp_pos=None) -> str:
+    def draw(self, update=True, text_color=(0, 0, 0), bkp_pos=None, hint_color=(100, 100, 100)) -> str:
         '''Usage: 'temp = field_name.draw(...); if temp is not False: target = temp' where target is the string you want to get as user input'''
         self.was_clicked = pygame.mouse.get_pressed()[0]
         if self.active and update and not list_captures_events:
@@ -584,7 +604,7 @@ class TextField:
         self.surface.blit(text, (self.x + 5, self.y + self.height // 2 - text.get_height() // 2))
 
         if self.text == '':
-            fancy_blit(self.surface, self.x, self.y + self.height // 2 - text.get_height() // 2, self.hint, self.font, text_color, self.field_color)
+            fancy_blit(self.surface, self.x, self.y + self.height // 2 - text.get_height() // 2, self.hint, self.font, hint_color, self.field_color)
 
         pygame.draw.rect(self.surface, outline_color, (self.x, self.y, self.width, self.height), outline_width)
 
